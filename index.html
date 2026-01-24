@@ -121,6 +121,7 @@
             userBadges: {},
             currentTime: new Date(),
             showDataInfo: true
+            eventAnalyses: {}
         };
         // Firebase storage - shared across all users!
         const storage = {
@@ -176,27 +177,33 @@ async function analyzeEvent(event) {
         }
 
         async function handleAnalyze(eventName) {
-    console.log('=== ANALYZE CLICKED ===');
-    console.log('Event name:', eventName);
-    
-    const event = MOCK_EVENTS.find(e => e.event === eventName);
-    console.log('Found event:', event);
-    
-    const button = document.getElementById(`analyze-btn-${eventName}`);
-    console.log('Button element:', button);
-    
-    const resultDiv = document.getElementById(`analysis-${eventName}`);
-    console.log('Result div element:', resultDiv);
-    
-    if (!button) {
-        console.error('❌ BUTTON NOT FOUND!');
-        return;
-    }
-    
-    if (!resultDiv) {
-        console.error('❌ RESULT DIV NOT FOUND!');
-        return;
-    }
+            console.log('=== ANALYZE CLICKED ===');
+            console.log('Event name:', eventName);
+            
+            const event = MOCK_EVENTS.find(e => e.event === eventName);
+            console.log('Found event:', event);
+            
+            if (!event) {
+                console.error('❌ EVENT NOT FOUND!');
+                return;
+            }
+            
+            // Set loading state in state object
+            state.eventAnalyses[eventName] = { loading: true, text: '' };
+            render();
+            
+            console.log('Calling analyzeEvent...');
+            
+            // Get analysis
+            const analysis = await analyzeEvent(event);
+            console.log('Analysis received:', analysis);
+            
+            // Store result in state
+            state.eventAnalyses[eventName] = { loading: false, text: analysis };
+            render();
+            
+            console.log('✅ Analysis stored and rendered');
+        }
     
     // Show loading state
     button.disabled = true;
@@ -502,7 +509,13 @@ async function analyzeEvent(event) {
                                             `;
                                         }).join('')}
                                     </div>         
-                                   <div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 min-h-20"></div>
+                                   <div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 min-h-20">
+    ${state.eventAnalyses[event.event]?.loading ? 
+        '<p class="text-gray-500 italic">Generating analysis...</p>' : 
+        state.eventAnalyses[event.event]?.text ? 
+        `<p class="text-gray-700">${state.eventAnalyses[event.event].text}</p>` : 
+        ''}
+</div>
                                 </div>
                             `;
                         }).join('')}
@@ -595,5 +608,6 @@ async function analyzeEvent(event) {
 </body>
 
 </html>
+
 
 
