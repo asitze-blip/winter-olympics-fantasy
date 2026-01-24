@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Winter Olympics Fantasy League</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        .animate-bounce { animation: bounce 2s infinite; }
+        .animate-pulse { animation: pulse 2s infinite; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app"></div>
+
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAdOaJoUJx8N_OVnp9vZxFyYfx8s4G1MLk",
+            authDomain: "winter-olympics-fantasy-app.firebaseapp.com",
+            projectId: "winter-olympics-fantasy-app",
+            storageBucket: "winter-olympics-fantasy-app.firebasestorage.app",
+            messagingSenderId: "713102154905",
+            appId: "1:713102154905:web:2b40ca72a9b3002171ec08"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        // Mock events data
+        const MOCK_EVENTS = [
+            {
+                event: "Men's Downhill",
+                time: "2026-02-10T11:00:00",
+                contenders: [
+                    {name: "Marco Odermatt", country: "Switzerland"},
+                    {name: "Aleksander Aamodt Kilde", country: "Norway"},
+                    {name: "Vincent Kriechmayr", country: "Austria"},
+                    {name: "Matthias Mayer", country: "Austria"},
+                    {name: "Dominik Paris", country: "Italy"}
+                ]
+            },
+            {
+                event: "Women's 1500m Speed Skating",
+                time: "2026-02-10T14:30:00",
+                contenders: [
+                    {name: "Miho Takagi", country: "Japan"},
+                    {name: "Irene Schouten", country: "Netherlands"},
+                    {name: "Antoinette de Jong", country: "Netherlands"},
+                    {name: "Brittany Bowe", country: "USA"},
+                    {name: "Ivanie Blondin", country: "Canada"}
+                ]
+            },
+            {
+                event: "Mixed Team Ski Jumping",
+                time: "2026-02-10T19:00:00",
+                contenders: [
+                    {name: "Team Austria", country: "Austria"},
+                    {name: "Team Germany", country: "Germany"},
+                    {name: "Team Slovenia", country: "Slovenia"},
+                    {name: "Team Norway", country: "Norway"},
+                    {name: "Team Japan", country: "Japan"}
+                ]
+            },
+            {
+                event: "Women's Moguls Finals",
+                time: "2026-02-10T20:30:00",
+                contenders: [
+                    {name: "Perrine Laffont", country: "France"},
+                    {name: "Jakara Anthony", country: "Australia"},
+                    {name: "Anri Kawamura", country: "Japan"},
+                    {name: "Jaelin Kauf", country: "USA"},
+                    {name: "Valeriia Bogdanova", country: "Kazakhstan"}
+                ]
+            },
+            {
+                event: "Men's 5000m Speed Skating",
+                time: "2026-02-10T16:00:00",
+                contenders: [
+                    {name: "Nils van der Poel", country: "Sweden"},
+                    {name: "Patrick Roest", country: "Netherlands"},
+                    {name: "Jorrit Bergsma", country: "Netherlands"},
+                    {name: "Hallgeir Engebråten", country: "Norway"},
+                    {name: "Ted-Jan Bloemen", country: "Canada"}
+                ]
+            }
+        ];
+
+        const MULTIPLIER_DAYS = {
+            "2026-02-10": { name: "Opening Day Bonanza", multiplier: 2 }
+        };
+
+        const BADGE_DEFINITIONS = [
+            { id: 'first_pick', name: 'First Pick', icon: '🎯', description: 'Made your first prediction' },
+            { id: 'early_bird', name: 'Early Bird', icon: '🐦', description: 'Made picks for all events before first one started' },
+            { id: 'century_club', name: 'Century Club', icon: '💰', description: 'Reached 100 points' }
+        ];
+
+        // App State
+        let state = {
+            currentUser: null,
+            usernameInput: '',
+            activeTab: 'events',
+            userPicks: {},
+            allUserScores: {},
+            userBadges: {},
+            currentTime: new Date(),
+            showDataInfo: true
+        };
+        // Firebase storage - shared across all users!
+        const storage = {
+            async get(key) {
+                try {
+                    const doc = await db.collection('gameData').doc(key).get();
+                    return doc.exists ? doc.data().value : {};
+                } catch (error) {
+                    console.log('Firebase read failed:', error);
+                    return {};
+                }
+            },
+            async set(key, value) {
+                try {
+                    await db.collection('gameData').doc(key).set({ value: value });
+                } catch (error) {
+                    console.log('Firebase write failed:', error);
+                }
+            }
+        };
+        async function loadData() {
+            state.userPicks = await storage.get('picks');
+            state.allUserScores = await storage.get('scores');
+            state.userBadges = await storage.get('badges')
+        }
+
+        async function saveData() {
+            await storage.set('picks', state.userPicks);
+            await storage.set('scores', state.allUserScores);
+            await storage.set('badges', state.userBadges);
+        }
+async function analyzeEvent(event) {
+            const contenders = event.contenders.map(c => `${c.name} (${c.country})`).join(', ');
+            
+            try {
+                const response = await fetch('/.netlify/functions/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        eventName: event.event,
+                        contenders: contenders
+                    })
+                });
+
+                const data = await response.json();
+                return data.analysis || 'Unable to generate analysis.';
+            } catch (error) {
+                console.error('Analysis error:', error);
+                return 'Unable to generate analysis at this time.';
+            }
+        }
+
+        async function handleAnalyze(eventName) {
+            const event = MOCK_EVENTS.find(e => e.event === eventName);
+            const button = document.getElementById(`analyze-btn-${eventName}`);
+            const resultDiv = document.getElementById(`analysis-${eventName}`);
+            
+            // Show loading state
+            button.disabled = true;
+            button.textContent = 'Analyzing...';
+            resultDiv.innerHTML = '<p class="text-gray-500 italic">Generating analysis...</p>';
+            
+            // Get analysis
+            const analysis = await analyzeEvent(event);
+            
+            // Show result
+            resultDiv.innerHTML = `<p class="text-gray-700">${analysis}</p>`;
+            button.textContent = 'Analyze Again';
+            button.disabled = false;
+        }
+        function checkBadges() {
+            if (!state.currentUser) return;
+            
+            const newBadges = {...(state.userBadges[state.currentUser] || {})};
+            const userPickCount = Object.keys(state.userPicks[state.currentUser] || {}).length;
+            
+            if (userPickCount >= 1 && !newBadges.first_pick) {
+                newBadges.first_pick = true;
+            }
+            
+            if (userPickCount === MOCK_EVENTS.length && !newBadges.early_bird) {
+                newBadges.early_bird = true;
+            }
+            
+            if ((state.allUserScores[state.currentUser] || 0) >= 100 && !newBadges.century_club) {
+                newBadges.century_club = true;
+            }
+            
+            state.userBadges[state.currentUser] = newBadges;
+            saveData();
+        }
+
+        function isEventLocked(event) {
+            const eventTime = new Date(event.time);
+            const lockTime = new Date(eventTime.getTime() - 5 * 60000);
+            return state.currentTime >= lockTime;
+        }
+
+        function getTimeUntilEvent(eventTime) {
+            const diff = new Date(eventTime) - state.currentTime;
+            if (diff < 0) return 'Event ended';
+            
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m ${seconds}s`;
+            return `${seconds}s`;
+        }
+
+        function getPickDistribution(event) {
+            const picks = {};
+            Object.values(state.userPicks).forEach(userPicksObj => {
+                const pick = userPicksObj[event.event];
+                if (pick) picks[pick] = (picks[pick] || 0) + 1;
+            });
+            
+            const total = Object.values(picks).reduce((sum, count) => sum + count, 0);
+            return event.contenders.map(c => ({
+                ...c,
+                pickCount: picks[c.name] || 0,
+                percentage: total > 0 ? Math.round((picks[c.name] || 0) / total * 100) : 0
+            }));
+        }
+
+        function getUserStats() {
+            if (!state.currentUser) return null;
+            const picks = state.userPicks[state.currentUser] || {};
+            const totalPicks = Object.keys(picks).length;
+            const score = state.allUserScores[state.currentUser] || 0;
+            const badges = Object.keys(state.userBadges[state.currentUser] || {}).filter(b => state.userBadges[state.currentUser][b]);
+            
+            return { totalPicks, score, badgeCount: badges.length };
+        }
+
+        function handleSignIn() {
+            if (state.usernameInput.trim()) {
+                state.currentUser = state.usernameInput.trim();
+                if (!state.allUserScores[state.currentUser]) {
+                    state.allUserScores[state.currentUser] = 0;
+                    saveData();
+                }
+                render();
+            }
+        }
+
+        function handleMakePick(eventName, contenderName) {
+            const event = MOCK_EVENTS.find(e => e.event === eventName);
+            if (isEventLocked(event)) return;
+            
+            if (!state.userPicks[state.currentUser]) {
+                state.userPicks[state.currentUser] = {};
+            }
+            state.userPicks[state.currentUser][eventName] = contenderName;
+            saveData();
+            checkBadges();
+            render();
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (!state.currentUser) {
+                app.innerHTML = `
+                    <div class="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
+                        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full transform transition-all duration-300">
+                            <div class="text-center mb-6">
+                                <div class="inline-block p-4 bg-yellow-100 rounded-full mb-4 animate-bounce">
+                                    <svg class="w-16 h-16 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                                    </svg>
+                                </div>
+                                <h1 class="text-3xl font-bold text-gray-800 mb-2">Winter Olympics</h1>
+                                <h2 class="text-xl text-gray-600 mb-2">Fantasy League</h2>
+                                <p class="text-sm text-gray-500">🧪 Using Mock Data for Testing</p>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <input
+                                    type="text"
+                                    id="usernameInput"
+                                    value="${state.usernameInput}"
+                                    placeholder="Choose your username"
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-lg transition-all"
+                                />
+                                <button
+                                    onclick="handleSignIn()"
+                                    class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-102"
+                                >
+                                    Join the League
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                const input = document.getElementById('usernameInput');
+                input.addEventListener('input', (e) => {
+                    state.usernameInput = e.target.value;
+                });
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') handleSignIn();
+                });
+                return;
+            }
+
+            // Main app view
+            const stats = getUserStats();
+            const multiplier = MULTIPLIER_DAYS["2026-02-10"];
+            
+            app.innerHTML = `
+                <div class="min-h-screen bg-gray-100">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg sticky top-0 z-50">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="flex justify-between items-center mb-2">
+                                <div>
+                                    <h1 class="text-xl md:text-2xl font-bold">Winter Olympics Fantasy</h1>
+                                    <p class="text-blue-100 text-sm md:text-base">Welcome, ${state.currentUser}!</p>
+                                </div>
+                                <button
+                                    onclick="state.currentUser = null; render();"
+                                    class="bg-white/20 px-3 py-1.5 md:px-4 md:py-2 rounded hover:bg-white/30 transition text-sm md:text-base"
+                                >
+                                    Sign Out
+                                </button>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+                                <div class="bg-white/10 rounded-lg p-2">
+                                    <div class="text-lg md:text-2xl font-bold">${stats.score}</div>
+                                    <div class="text-xs text-blue-100">Points</div>
+                                </div>
+                                <div class="bg-white/10 rounded-lg p-2">
+                                    <div class="text-lg md:text-2xl font-bold">${stats.totalPicks}</div>
+                                    <div class="text-xs text-blue-100">Picks</div>
+                                </div>
+                                <div class="bg-white/10 rounded-lg p-2">
+                                    <div class="text-lg md:text-2xl font-bold">${stats.badgeCount}</div>
+                                    <div class="text-xs text-blue-100">Badges</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${multiplier ? `
+                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-2 px-4 text-center animate-pulse">
+                        ⚡ <strong>${multiplier.name}</strong> - All points ×${multiplier.multiplier} today!
+                    </div>
+                    ` : ''}
+
+                    <!-- Tabs -->
+                    <div class="bg-white shadow sticky top-16 md:top-20 z-40">
+                        <div class="max-w-4xl mx-auto flex">
+                            <button onclick="state.activeTab = 'events'; render();" 
+                                class="flex-1 py-3 md:py-4 font-semibold transition-all text-sm md:text-base ${state.activeTab === 'events' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}">
+                                📋 Events
+                            </button>
+                            <button onclick="state.activeTab = 'leaderboard'; render();"
+                                class="flex-1 py-3 md:py-4 font-semibold transition-all text-sm md:text-base ${state.activeTab === 'leaderboard' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}">
+                                👥 Leaderboard
+                            </button>
+                            <button onclick="state.activeTab = 'stats'; render();"
+                                class="flex-1 py-3 md:py-4 font-semibold transition-all text-sm md:text-base ${state.activeTab === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}">
+                                📊 Stats
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="max-w-4xl mx-auto p-3 md:p-4">
+                        ${state.showDataInfo ? `
+                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 md:p-4 mb-4 rounded animate-fade-in">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs md:text-sm text-yellow-800">
+                                    <strong>📝 Dev Note:</strong> Using mock data. We'll add API automation in the next step!
+                                </p>
+                                <button onclick="state.showDataInfo = false; render();" class="text-yellow-600 hover:text-yellow-800 ml-2">✕</button>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <div id="tabContent"></div>
+                    </div>
+                </div>
+            `;
+
+            renderTabContent();
+        }
+
+        function renderTabContent() {
+            const content = document.getElementById('tabContent');
+            
+            if (state.activeTab === 'events') {
+                content.innerHTML = `
+                    <div class="space-y-3 md:space-y-4">
+                        <h2 class="text-xl md:text-2xl font-bold text-gray-800">Medal Events Today</h2>
+                        ${MOCK_EVENTS.map((event, idx) => {
+                            const locked = isEventLocked(event);
+                            const distribution = getPickDistribution(event);
+                            const userPick = state.userPicks[state.currentUser]?.[event.event];
+                            
+                            return `
+                                <div class="bg-white rounded-lg shadow p-4 md:p-6 transition-all duration-300 hover:scale-102 ${locked ? 'opacity-75' : ''}">
+                                    <div class="flex flex-col md:flex-row md:justify-between md:items-start mb-4 gap-2">
+                                        <div class="flex-1">
+                                            <h3 class="text-lg md:text-xl font-bold text-gray-800">${event.event}</h3>
+                                            <div class="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                                                🕐 <span>${getTimeUntilEvent(event.time)}</span>
+                                                ${locked ? '🔒' : ''}
+                                            </div>
+                                        </div>
+                                        <button
+                                            id="analyze-btn-${event.event}"
+                                            onclick="handleAnalyze(\`${event.event}\`)"
+                                            class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition whitespace-nowrap"
+                                        >
+                                            🤖 Analyze
+                                        </button>
+                                        <div class="flex gap-2">
+                                            ${userPick ? '<span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">✓ Picked</span>' : ''}
+                                            ${locked ? '<span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">🔒 Locked</span>' : ''}
+                                        </div>
+                                    </div>
+
+                                    <p class="text-xs md:text-sm font-semibold text-gray-600 mb-3">Top 5 Contenders:</p>
+                                    <div class="space-y-2">
+                                        ${distribution.map(contender => {
+                                            const isSelected = state.userPicks[state.currentUser]?.[event.event] === contender.name;
+                                            return `
+                                                <button
+                                                    onclick="handleMakePick(\`${event.event}\`, \`${contender.name}\`)"
+                                                    ${locked ? 'disabled' : ''}
+                                                    class="w-full text-left p-3 rounded-lg border-2 transition-all duration-200 ${
+                                                        isSelected ? 'border-blue-500 bg-blue-50' :
+                                                        locked ? 'border-gray-200 bg-gray-50' :
+                                                        'border-gray-200 hover:border-blue-300 hover:bg-gray-50 hover:scale-102'
+                                                    }"
+                                                >
+                                                    <div class="flex justify-between items-center">
+                                                        <div>
+                                                            <span class="font-semibold text-sm md:text-base">${contender.name}</span>
+                                                            <span class="text-gray-500 ml-2 text-xs md:text-sm">(${contender.country})</span>
+                                                        </div>
+                                                        ${userPick && contender.pickCount > 0 ? `<div class="text-xs md:text-sm text-gray-500">${contender.percentage}% picked</div>` : ''}
+                                                    </div>
+                                                    ${userPick && contender.pickCount > 0 ? `
+                                                        <div class="mt-2 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                                            <div class="bg-blue-500 h-full transition-all duration-500" style="width: ${contender.percentage}%"></div>
+                                                        </div>
+                                                    ` : ''}
+                                                </button>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                    </div>
+                                    
+                                    <div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200"></div>
+                                </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } else if (state.activeTab === 'leaderboard') {
+                const sortedUsers = Object.entries(state.allUserScores).sort(([,a], [,b]) => b - a);
+                content.innerHTML = `
+                    <div class="bg-white rounded-lg shadow p-4 md:p-6">
+                        <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Leaderboard</h2>
+                        ${sortedUsers.length === 0 ? 
+                            '<p class="text-gray-500 text-center py-8 text-sm md:text-base">No players yet. Be the first to make a pick!</p>' :
+                            `<div class="space-y-2">
+                                ${sortedUsers.map(([username, score], idx) => `
+                                    <div class="flex justify-between items-center p-3 md:p-4 rounded-lg transition-all duration-300 hover:scale-102 ${
+                                        username === state.currentUser ? 'bg-blue-50 border-2 border-blue-500' : 'bg-gray-50'
+                                    }">
+                                        <div class="flex items-center gap-2 md:gap-3">
+                                            <span class="text-xl md:text-2xl font-bold text-gray-400">#${idx + 1}</span>
+                                            <span class="font-semibold text-gray-800 text-sm md:text-base">${username}</span>
+                                            ${username === state.currentUser ? '<span class="text-blue-600 text-xs md:text-sm">(You)</span>' : ''}
+                                        </div>
+                                        <div class="text-xl md:text-2xl font-bold text-blue-600">${score}</div>
+                                    </div>
+                                `).join('')}
+                            </div>`
+                        }
+                    </div>
+                `;
+            } else if (state.activeTab === 'stats') {
+                const stats = getUserStats();
+                const userBadges = state.userBadges[state.currentUser] || {};
+                content.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-lg shadow p-4 md:p-6">
+                            <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Your Statistics</h2>
+                            
+                            <div class="grid grid-cols-2 gap-4 mb-6">
+                                <div class="bg-blue-50 rounded-lg p-4 text-center">
+                                    <div class="text-2xl md:text-3xl font-bold text-blue-600">${stats.totalPicks}</div>
+                                    <div class="text-xs md:text-sm text-gray-600">Total Picks</div>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-4 text-center">
+                                    <div class="text-2xl md:text-3xl font-bold text-green-600">${stats.score}</div>
+                                    <div class="text-xs md:text-sm text-gray-600">Total Points</div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-t pt-4">
+                                <h3 class="font-semibold text-gray-800 mb-3">🏆 Your Badges (${stats.badgeCount})</h3>
+                                
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    ${BADGE_DEFINITIONS.map(badge => {
+                                        const earned = userBadges[badge.id];
+                                        return `
+                                            <div class="p-3 rounded-lg border-2 text-center transition-all ${
+                                                earned ? 'border-yellow-400 bg-yellow-50 animate-fade-in' : 'border-gray-200 bg-gray-50 opacity-40'
+                                            }">
+                                                <div class="text-2xl md:text-3xl mb-1">${badge.icon}</div>
+                                                <div class="font-semibold text-xs md:text-sm">${badge.name}</div>
+                                                <div class="text-xs text-gray-500 mt-1">${badge.description}</div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Update time every second
+        setInterval(() => {
+            state.currentTime = new Date();
+            if (state.currentUser && state.activeTab === 'events') {
+                renderTabContent();
+            }
+        }, 1000);
+
+        // Initial load - wait for data before rendering
+        loadData().then(() => {
+            render();
+        });
+        // Make functions available to the webpage buttons
+        window.handleSignIn = handleSignIn;
+        window.handleMakePick = handleMakePick;
+        window.render = render;
+    </script>
+</body>
+</html>
