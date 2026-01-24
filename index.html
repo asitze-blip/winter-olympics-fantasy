@@ -511,8 +511,8 @@ async function analyzeEvent(event) {
                                     </div>         
                                    </div>         
                                     <div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 min-h-20">
-                                        ${state.eventAnalyses[event.event]?.loading ? '<p class="text-gray-500 italic">Generating analysis...</p>' : state.eventAnalyses[event.event]?.text ? `<p class="text-gray-700">${state.eventAnalyses[event.event].text}</p>` : ''}
-                                    </div>
+                                        ${state.eventAnalyses[event.event]?.loading ? '<p class="text-gray-500 italic">Generating analysis...</p>' : state.eventAnalyses[event.event]?.text ? `<p class="text-gray-700">${state.eventAnalyses[event.event].text}</p>` : ''}</div>
+                                 
                                 </div>
                                 </div>
                             `;
@@ -606,6 +606,7 @@ async function analyzeEvent(event) {
 </body>
 
 </html>
+
 
 
 
