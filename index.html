@@ -176,23 +176,46 @@ async function analyzeEvent(event) {
         }
 
         async function handleAnalyze(eventName) {
-            const event = MOCK_EVENTS.find(e => e.event === eventName);
-            const button = document.getElementById(`analyze-btn-${eventName}`);
-            const resultDiv = document.getElementById(`analysis-${eventName}`);
-            
-            // Show loading state
-            button.disabled = true;
-            button.textContent = 'Analyzing...';
-            resultDiv.innerHTML = '<p class="text-gray-500 italic">Generating analysis...</p>';
-            
-            // Get analysis
-            const analysis = await analyzeEvent(event);
-            
-            // Show result
-            resultDiv.innerHTML = `<p class="text-gray-700">${analysis}</p>`;
-            button.textContent = 'Analyze Again';
-            button.disabled = false;
-        }
+    console.log('=== ANALYZE CLICKED ===');
+    console.log('Event name:', eventName);
+    
+    const event = MOCK_EVENTS.find(e => e.event === eventName);
+    console.log('Found event:', event);
+    
+    const button = document.getElementById(`analyze-btn-${eventName}`);
+    console.log('Button element:', button);
+    
+    const resultDiv = document.getElementById(`analysis-${eventName}`);
+    console.log('Result div element:', resultDiv);
+    
+    if (!button) {
+        console.error('❌ BUTTON NOT FOUND!');
+        return;
+    }
+    
+    if (!resultDiv) {
+        console.error('❌ RESULT DIV NOT FOUND!');
+        return;
+    }
+    
+    // Show loading state
+    button.disabled = true;
+    button.textContent = 'Analyzing...';
+    resultDiv.innerHTML = '<p class="text-gray-500 italic">Generating analysis...</p>';
+    console.log('Set loading state');
+    
+    // Get analysis
+    const analysis = await analyzeEvent(event);
+    console.log('Got analysis:', analysis);
+    
+    // Show result
+    resultDiv.innerHTML = `<p class="text-gray-700">${analysis}</p>`;
+    console.log('Set result HTML');
+    
+    button.textContent = 'Analyze Again';
+    button.disabled = false;
+    console.log('=== DONE ===');
+}
         function checkBadges() {
             if (!state.currentUser) return;
             
@@ -572,3 +595,4 @@ async function analyzeEvent(event) {
 </body>
 
 </html>
+
