@@ -203,22 +203,7 @@ async function analyzeEvent(event) {
             render();
             
             console.log('✅ Analysis stored and rendered');
-        }
-    
-    // Show loading state
-    button.disabled = true;
-    button.textContent = 'Analyzing...';
-    resultDiv.innerHTML = '<p class="text-gray-500 italic">Generating analysis...</p>';
-    console.log('Set loading state');
-    
-    // Get analysis
-    const analysis = await analyzeEvent(event);
-    console.log('Got analysis:', analysis);
-    
-    // Show result
-    resultDiv.innerHTML = `<p class="text-gray-700">${analysis}</p>`;
-    console.log('Set result HTML');
-    
+        }   
     button.textContent = 'Analyze Again';
     button.disabled = false;
     console.log('=== DONE ===');
@@ -606,6 +591,7 @@ async function analyzeEvent(event) {
 </body>
 
 </html>
+
 
 
 
