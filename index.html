@@ -625,127 +625,210 @@ async function analyzeEvent(event) {
                 </div>
             `;
 
-            renderTabContent();
-        }
-
-        function renderTabContent() {
-            const content = document.getElementById('tabContent');
-            
-// Replace the existing stats tab section with this:
-
-if (state.activeTab === 'stats') {
-    const stats = getUserStats();
-    const medals = getUserMedals();
-    const userBadges = state.userBadges[state.currentUser] || {};
+  function renderTabContent() {
+    const content = document.getElementById('tabContent');
     
-    content.innerHTML = `
-        <div class="space-y-4">
-            <div class="bg-white rounded-lg shadow p-4 md:p-6">
-                <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Your Statistics</h2>
-                
-                <div class="grid grid-cols-2 gap-4 mb-6">
-                    <div class="bg-blue-50 rounded-lg p-4 text-center">
-                        <div class="text-2xl md:text-3xl font-bold text-blue-600">${stats.totalPicks}</div>
-                        <div class="text-xs md:text-sm text-gray-600">Total Picks</div>
-                    </div>
-                    <div class="bg-green-50 rounded-lg p-4 text-center">
-                        <div class="text-2xl md:text-3xl font-bold text-green-600">${stats.score}</div>
-                        <div class="text-xs md:text-sm text-gray-600">Total Points</div>
-                    </div>
-                </div>
-                
-                <!-- NEW: Medal Breakdown -->
-<div class="border-t pt-4 mb-6">
-    <h3 class="font-semibold text-gray-800 mb-3">🏅 Your Medals</h3>
-    
-    ${(medals.gold.length + medals.silver.length + medals.bronze.length === 0) ? 
-        '<p class="text-gray-500 text-sm italic">No medals yet. Results will appear here after events are completed!</p>' 
-        : 
-        (medals.gold.length > 0 ? `
-            <div class="mb-3">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="text-2xl">🥇</span>
-                    <span class="font-semibold">Gold (${medals.gold.length} × 3pts = ${medals.gold.length * 3}pts)</span>
-                </div>
-                <ul class="ml-8 text-sm text-gray-600 space-y-1">
-                    ${medals.gold.map(event => `<li>• ${event}</li>`).join('')}
-                </ul>
-            </div>
-        ` : '') +
-        (medals.silver.length > 0 ? `
-            <div class="mb-3">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="text-2xl">🥈</span>
-                    <span class="font-semibold">Silver (${medals.silver.length} × 2pts = ${medals.silver.length * 2}pts)</span>
-                </div>
-                <ul class="ml-8 text-sm text-gray-600 space-y-1">
-                    ${medals.silver.map(event => `<li>• ${event}</li>`).join('')}
-                </ul>
-            </div>
-        ` : '') +
-        (medals.bronze.length > 0 ? `
-            <div class="mb-3">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="text-2xl">🥉</span>
-                    <span class="font-semibold">Bronze (${medals.bronze.length} × 1pt = ${medals.bronze.length}pts)</span>
-                </div>
-                <ul class="ml-8 text-sm text-gray-600 space-y-1">
-                    ${medals.bronze.map(event => `<li>• ${event}</li>`).join('')}
-                </ul>
-            </div>
-        ` : '')
-    }
-</div>
-                
-                <!-- Existing Badges Section -->
-                <div class="border-t pt-4">
-                    <h3 class="font-semibold text-gray-800 mb-3">🏆 Your Badges (${stats.badgeCount})</h3>
+    if (state.activeTab === 'events') {
+        content.innerHTML = `
+            <div class="space-y-3 md:space-y-4">
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Medal Events</h2>
+                ${EVENTS.map((event, idx) => {
+                    const locked = isEventLocked(event);
+                    const distribution = getPickDistribution(event);
+                    const userPick = state.userPicks[state.currentUser]?.[event.event];
                     
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        ${BADGE_DEFINITIONS.map(badge => {
-                            const earned = userBadges[badge.id];
-                            return `
-                                <div class="p-3 rounded-lg border-2 text-center transition-all ${
-                                    earned ? 'border-yellow-400 bg-yellow-50 animate-fade-in' : 'border-gray-200 bg-gray-50 opacity-40'
-                                }">
-                                    <div class="text-2xl md:text-3xl mb-1">${badge.icon}</div>
-                                    <div class="font-semibold text-xs md:text-sm">${badge.name}</div>
-                                    <div class="text-xs text-gray-500 mt-1">${badge.description}</div>
+                    return `
+                        <div class="bg-white rounded-lg shadow p-4 md:p-6 transition-all duration-300">
+                            <div class="flex flex-col md:flex-row md:justify-between md:items-start mb-4 gap-2">
+                                <div class="flex-1">
+                                    <h3 class="text-lg md:text-xl font-bold text-gray-800">${event.event}</h3>
+                                    <div class="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                                        🕐 <span>${getTimeUntilEvent(event.time)}</span>
+                                        ${locked ? '🔒' : ''}
+                                    </div>
                                 </div>
-                            `;
-                        }).join('')}
+                                <button
+                                    id="analyze-btn-${event.event}"
+                                    onclick="handleAnalyze(\`${event.event}\`)"
+                                    class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition whitespace-nowrap"
+                                >
+                                    🤖 Analyze
+                                </button>
+                                <div class="flex gap-2">
+                                    ${userPick ? '<span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">✓ Picked</span>' : ''}
+                                    ${locked ? '<span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">🔒 Locked</span>' : ''}
+                                </div>
+                            </div>
+
+                            <p class="text-xs md:text-sm font-semibold text-gray-600 mb-3">Top 5 Contenders:</p>
+                            <div class="space-y-2">
+                                ${distribution.map(contender => {
+                                    const isSelected = state.userPicks[state.currentUser]?.[event.event] === contender.name;
+                                    return `
+                                        <button
+                                            onclick="handleMakePick(\`${event.event}\`, \`${contender.name}\`)"
+                                            ${locked ? 'disabled' : ''}
+                                            class="w-full text-left p-3 rounded-lg border-2 transition-all duration-200 ${
+                                                isSelected ? 'border-blue-500 bg-blue-50' :
+                                                locked ? 'border-gray-200 bg-gray-50' :
+                                                'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                                            }"
+                                        >
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <span class="font-semibold text-sm md:text-base">${contender.name}</span>
+                                                    <span class="text-gray-500 ml-2 text-xs md:text-sm">(${contender.country})</span>
+                                                </div>
+                                                ${userPick && contender.pickCount > 0 ? `<div class="text-xs md:text-sm text-gray-500">${contender.percentage}% picked</div>` : ''}
+                                            </div>
+                                            ${userPick && contender.pickCount > 0 ? `
+                                                <div class="mt-2 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                                    <div class="bg-blue-500 h-full transition-all duration-500" style="width: ${contender.percentage}%"></div>
+                                                </div>
+                                            ` : ''}
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 min-h-20">${state.eventAnalyses[event.event]?.loading ? '<p class="text-gray-500 italic">Generating analysis...</p>' : state.eventAnalyses[event.event]?.text ? `<p class="text-gray-700">${state.eventAnalyses[event.event].text}</p>` : ''}</div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    } else if (state.activeTab === 'leaderboard') {
+        const sortedUsers = Object.entries(state.allUserScores).sort(([,a], [,b]) => b - a);
+        content.innerHTML = `
+            <div class="bg-white rounded-lg shadow p-4 md:p-6">
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Leaderboard</h2>
+                ${sortedUsers.length === 0 ? 
+                    '<p class="text-gray-500 text-center py-8 text-sm md:text-base">No players yet. Be the first to make a pick!</p>' :
+                    `<div class="space-y-2">
+                        ${sortedUsers.map(([username, score], idx) => `
+                            <div class="flex justify-between items-center p-3 md:p-4 rounded-lg transition-all duration-300 ${
+                                username === state.currentUser ? 'bg-blue-50 border-2 border-blue-500' : 'bg-gray-50'
+                            }">
+                                <div class="flex items-center gap-2 md:gap-3">
+                                    <span class="text-xl md:text-2xl font-bold text-gray-400">#${idx + 1}</span>
+                                    <span class="font-semibold text-gray-800 text-sm md:text-base">${username}</span>
+                                    ${username === state.currentUser ? '<span class="text-blue-600 text-xs md:text-sm">(You)</span>' : ''}
+                                </div>
+                                <div class="text-xl md:text-2xl font-bold text-blue-600">${score}</div>
+                            </div>
+                        `).join('')}
+                    </div>`
+                }
+            </div>
+        `;
+    } else if (state.activeTab === 'stats') {
+        const stats = getUserStats();
+        const medals = getUserMedals();
+        const userBadges = state.userBadges[state.currentUser] || {};
+        
+        content.innerHTML = `
+            <div class="space-y-4">
+                <div class="bg-white rounded-lg shadow p-4 md:p-6">
+                    <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Your Statistics</h2>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-blue-50 rounded-lg p-4 text-center">
+                            <div class="text-2xl md:text-3xl font-bold text-blue-600">${stats.totalPicks}</div>
+                            <div class="text-xs md:text-sm text-gray-600">Total Picks</div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4 text-center">
+                            <div class="text-2xl md:text-3xl font-bold text-green-600">${stats.score}</div>
+                            <div class="text-xs md:text-sm text-gray-600">Total Points</div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4 mb-6">
+                        <h3 class="font-semibold text-gray-800 mb-3">🏅 Your Medals</h3>
+                        ${(medals.gold.length + medals.silver.length + medals.bronze.length === 0) ? 
+                            '<p class="text-gray-500 text-sm italic">No medals yet. Results will appear here after events are completed!</p>' 
+                            : 
+                            (medals.gold.length > 0 ? `
+                                <div class="mb-3">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="text-2xl">🥇</span>
+                                        <span class="font-semibold">Gold (${medals.gold.length} × 3pts = ${medals.gold.length * 3}pts)</span>
+                                    </div>
+                                    <ul class="ml-8 text-sm text-gray-600 space-y-1">
+                                        ${medals.gold.map(event => `<li>• ${event}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : '') +
+                            (medals.silver.length > 0 ? `
+                                <div class="mb-3">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="text-2xl">🥈</span>
+                                        <span class="font-semibold">Silver (${medals.silver.length} × 2pts = ${medals.silver.length * 2}pts)</span>
+                                    </div>
+                                    <ul class="ml-8 text-sm text-gray-600 space-y-1">
+                                        ${medals.silver.map(event => `<li>• ${event}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : '') +
+                            (medals.bronze.length > 0 ? `
+                                <div class="mb-3">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="text-2xl">🥉</span>
+                                        <span class="font-semibold">Bronze (${medals.bronze.length} × 1pt = ${medals.bronze.length}pts)</span>
+                                    </div>
+                                    <ul class="ml-8 text-sm text-gray-600 space-y-1">
+                                        ${medals.bronze.map(event => `<li>• ${event}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : '')
+                        }
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <h3 class="font-semibold text-gray-800 mb-3">🏆 Your Badges (${stats.badgeCount})</h3>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            ${BADGE_DEFINITIONS.map(badge => {
+                                const earned = userBadges[badge.id];
+                                return `
+                                    <div class="p-3 rounded-lg border-2 text-center transition-all ${
+                                        earned ? 'border-yellow-400 bg-yellow-50 animate-fade-in' : 'border-gray-200 bg-gray-50 opacity-40'
+                                    }">
+                                        <div class="text-2xl md:text-3xl mb-1">${badge.icon}</div>
+                                        <div class="font-semibold text-xs md:text-sm">${badge.name}</div>
+                                        <div class="text-xs text-gray-500 mt-1">${badge.description}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
+    }
 }
 
-        // Update time every second
-        setInterval(() => {
-            state.currentTime = new Date();
-            if (state.currentUser && state.activeTab === 'events') {
-                renderTabContent();
-            }
-        }, 1000);
+// Update time every second
+setInterval(() => {
+    state.currentTime = new Date();
+    if (state.currentUser && state.activeTab === 'events') {
+        renderTabContent();
+    }
+}, 1000);
 
-        // Initial load - wait for data before rendering
-        // Initial load - wait for data before rendering
-    async function initialize() {
+// Initial load
+async function initialize() {
     await loadData();
     await loadEvents();
     render();
 }
 
 initialize();
-        
-        // Make functions available to the webpage buttons
-        window.handleSignIn = handleSignIn;
-        window.handleMakePick = handleMakePick;
-        window.render = render;
+
+// Make functions available to the webpage buttons
+window.handleSignIn = handleSignIn;
+window.handleMakePick = handleMakePick;
+window.render = render;
     </script>
 </body>
-
 </html>
 
 
