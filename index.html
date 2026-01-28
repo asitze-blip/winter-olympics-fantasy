@@ -42,65 +42,169 @@
         
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        // Mock events data
-        const MOCK_EVENTS = [
-            {
-                event: "Men's Downhill",
-                time: "2026-02-10T11:00:00",
-                contenders: [
-                    {name: "Marco Odermatt", country: "Switzerland"},
-                    {name: "Aleksander Aamodt Kilde", country: "Norway"},
-                    {name: "Vincent Kriechmayr", country: "Austria"},
-                    {name: "Matthias Mayer", country: "Austria"},
-                    {name: "Dominik Paris", country: "Italy"}
-                ]
-            },
-            {
-                event: "Women's 1500m Speed Skating",
-                time: "2026-02-10T14:30:00",
-                contenders: [
-                    {name: "Miho Takagi", country: "Japan"},
-                    {name: "Irene Schouten", country: "Netherlands"},
-                    {name: "Antoinette de Jong", country: "Netherlands"},
-                    {name: "Brittany Bowe", country: "USA"},
-                    {name: "Ivanie Blondin", country: "Canada"}
-                ]
-            },
-            {
-                event: "Mixed Team Ski Jumping",
-                time: "2026-02-10T19:00:00",
-                contenders: [
-                    {name: "Team Austria", country: "Austria"},
-                    {name: "Team Germany", country: "Germany"},
-                    {name: "Team Slovenia", country: "Slovenia"},
-                    {name: "Team Norway", country: "Norway"},
-                    {name: "Team Japan", country: "Japan"}
-                ]
-            },
-            {
-                event: "Women's Moguls Finals",
-                time: "2026-02-10T20:30:00",
-                contenders: [
-                    {name: "Perrine Laffont", country: "France"},
-                    {name: "Jakara Anthony", country: "Australia"},
-                    {name: "Anri Kawamura", country: "Japan"},
-                    {name: "Jaelin Kauf", country: "USA"},
-                    {name: "Valeriia Bogdanova", country: "Kazakhstan"}
-                ]
-            },
-            {
-                event: "Men's 5000m Speed Skating",
-                time: "2026-02-10T16:00:00",
-                contenders: [
-                    {name: "Nils van der Poel", country: "Sweden"},
-                    {name: "Patrick Roest", country: "Netherlands"},
-                    {name: "Jorrit Bergsma", country: "Netherlands"},
-                    {name: "Hallgeir Engebråten", country: "Norway"},
-                    {name: "Ted-Jan Bloemen", country: "Canada"}
-                ]
-            }
-        ];
+        
+        let EVENTS = []; //will be populated from Google Sheets
 
+const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpvFjZLOycMbDSRsFrUi7BbPvhH4yldpxR9ve3AXpxzJLtcVwO0WVYjRb_7v8kyHUFm5CpkMB9ZI5N/pub?output=csv';
+
+// Function to get today's date in YYYY-MM-DD format (CET timezone)
+function getTodayDateCET() {
+    const now = new Date();
+    // Convert to CET (UTC+1)
+    const cetOffset = 1 * 60; // CET is UTC+1
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const cetTime = new Date(utc + (cetOffset * 60000));
+    
+    const year = cetTime.getFullYear();
+    const month = String(cetTime.getMonth() + 1).padStart(2, '0');
+    const day = String(cetTime.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
+
+// Function to fetch and parse events from Google Sheets
+async function fetchEventsFromSheet() {
+    try {
+        console.log('Fetching events from Google Sheets...');
+        
+        const response = await fetch(GOOGLE_SHEETS_CSV_URL);
+        const csvText = await response.text();
+        
+        console.log('CSV fetched, parsing...');
+        
+        // Parse CSV using PapaParse (already available in your Netlify function)
+        // For the frontend, we'll use a simple CSV parser
+        const lines = csvText.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        
+        const events = [];
+        const todayDate = getTodayDateCET();
+        
+        console.log('Today\'s date (CET):', todayDate);
+        
+        for (let i = 1; i < lines.length; i++) {
+            const values = parseCSVLine(lines[i]);
+            const row = {};
+            
+            headers.forEach((header, index) => {
+                row[header] = values[index] ? values[index].trim().replace(/"/g, '') : '';
+            });
+            
+            // Skip if not today's date
+            if (row.Date !== todayDate) {
+                continue;
+            }
+            
+            // Skip if no event name
+            if (!row.Event) {
+                continue;
+            }
+            
+            // Determine if this is a team event
+            const isTeamEvent = row.IsTeamEvent === 'TRUE' || row.IsTeamEvent === 'True' || row.IsTeamEvent === '1';
+            
+            // Build contenders array
+            const contenders = [];
+            
+            if (isTeamEvent) {
+                // Team event - use Top1, Top2, etc (country names)
+                for (let j = 1; j <= 5; j++) {
+                    const country = row[`Top${j}`];
+                    if (country && country.trim()) {
+                        contenders.push({
+                            name: country,
+                            country: country
+                        });
+                    }
+                }
+            } else {
+                // Individual event - use Top1 Name + Top1 Country, etc
+                for (let j = 1; j <= 5; j++) {
+                    const name = row[`Top${j} Name`];
+                    const country = row[`Top${j} Country`];
+                    if (name && name.trim()) {
+                        contenders.push({
+                            name: name,
+                            country: country || ''
+                        });
+                    }
+                }
+            }
+            
+            // Only add event if we have contenders
+            if (contenders.length > 0) {
+                const eventName = `${row.Gender ? row.Gender + "'s " : ''}${row.Event}`;
+                
+                events.push({
+                    event: eventName,
+                    sport: row.Sport,
+                    venue: row.Venue,
+                    time: row.Date, // Just the date, no specific time
+                    isTeamEvent: isTeamEvent,
+                    contenders: contenders
+                });
+            }
+        }
+        
+        console.log(`Found ${events.length} events for today`);
+        return events;
+        
+    } catch (error) {
+        console.error('Error fetching events from Google Sheets:', error);
+        return [];
+    }
+}
+
+// Helper function to parse a CSV line (handles commas inside quotes)
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    
+    result.push(current);
+    return result;
+}
+
+// Replace your EVENTS initialization with this:
+let EVENTS = []; // Will be populated from Google Sheets
+
+// Add this function to load events when the app starts
+async function loadEvents() {
+    console.log('Loading events from Google Sheets...');
+    EVENTS = await fetchEventsFromSheet();
+    
+    if (EVENTS.length === 0) {
+        console.warn('No events found for today, using sample data');
+        // Optionally fall back to EVENTS or show a message
+    }
+    
+    // Re-render the app with new events
+    if (state.currentUser && state.activeTab === 'events') {
+        renderTabContent();
+    }
+}
+
+// Call this when the app loads (add to your existing initialization code)
+// Replace: const EVENTS = [...];
+// With: Just declare it empty and call loadEvents()
+
+// USAGE IN YOUR APP:
+// 1. Replace all references to EVENTS with EVENTS
+// 2. Call loadEvents() when the app starts
+// 3. Add a "Refresh Events" button that calls loadEvents() again
         const MULTIPLIER_DAYS = {
             "2026-02-10": { name: "Opening Day Bonanza", multiplier: 2 }
         };
@@ -180,7 +284,7 @@ async function analyzeEvent(event) {
             console.log('=== ANALYZE CLICKED ===');
             console.log('Event name:', eventName);
             
-            const event = MOCK_EVENTS.find(e => e.event === eventName);
+            const event = EVENTS.find(e => e.event === eventName);
             console.log('Found event:', event);
             
             if (!event) {
@@ -214,7 +318,7 @@ async function analyzeEvent(event) {
                 newBadges.first_pick = true;
             }
             
-            if (userPickCount === MOCK_EVENTS.length && !newBadges.early_bird) {
+            if (userPickCount === EVENTS.length && !newBadges.early_bird) {
                 newBadges.early_bird = true;
             }
             
@@ -282,7 +386,7 @@ async function analyzeEvent(event) {
         }
 
         function handleMakePick(eventName, contenderName) {
-            const event = MOCK_EVENTS.find(e => e.event === eventName);
+            const event = EVENTS.find(e => e.event === eventName);
             if (isEventLocked(event)) return;
             
             if (!state.userPicks[state.currentUser]) {
@@ -309,7 +413,6 @@ async function analyzeEvent(event) {
                                 </div>
                                 <h1 class="text-3xl font-bold text-gray-800 mb-2">Winter Olympics</h1>
                                 <h2 class="text-xl text-gray-600 mb-2">Fantasy League</h2>
-                                <p class="text-sm text-gray-500">🧪 Using Mock Data for Testing</p>
                             </div>
                             
                             <div class="space-y-4">
@@ -410,7 +513,6 @@ async function analyzeEvent(event) {
                         <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 md:p-4 mb-4 rounded animate-fade-in">
                             <div class="flex justify-between items-start">
                                 <p class="text-xs md:text-sm text-yellow-800">
-                                    <strong>📝 Dev Note:</strong> Using mock data. We'll add API automation in the next step!
                                 </p>
                                 <button onclick="state.showDataInfo = false; render();" class="text-yellow-600 hover:text-yellow-800 ml-2">✕</button>
                             </div>
@@ -428,11 +530,19 @@ async function analyzeEvent(event) {
         function renderTabContent() {
             const content = document.getElementById('tabContent');
             
-            if (state.activeTab === 'events') {
-                content.innerHTML = `
-                    <div class="space-y-3 md:space-y-4">
-                        <h2 class="text-xl md:text-2xl font-bold text-gray-800">Medal Events Today</h2>
-                        ${MOCK_EVENTS.map((event, idx) => {
+if (state.activeTab === 'events') {
+    content.innerHTML = `
+        <div class="space-y-3 md:space-y-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Medal Events Today</h2>
+                <button 
+                    onclick="loadEvents()"
+                    class="bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                >
+                    🔄 Refresh
+                </button>
+            </div>
+                        ${EVENTS.map((event, idx) => {
                             const locked = isEventLocked(event);
                             const distribution = getPickDistribution(event);
                             const userPick = state.userPicks[state.currentUser]?.[event.event];
@@ -576,9 +686,15 @@ async function analyzeEvent(event) {
         }, 1000);
 
         // Initial load - wait for data before rendering
-        loadData().then(() => {
-            render();
-        });
+        // Initial load - wait for data before rendering
+    async function initialize() {
+    await loadData();
+    await loadEvents();
+    render();
+}
+
+initialize();
+        
         // Make functions available to the webpage buttons
         window.handleSignIn = handleSignIn;
         window.handleMakePick = handleMakePick;
@@ -587,6 +703,7 @@ async function analyzeEvent(event) {
 </body>
 
 </html>
+
 
 
 
