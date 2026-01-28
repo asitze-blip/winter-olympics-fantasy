@@ -16,10 +16,10 @@ exports.handler = async (event) => {
             },
             body: JSON.stringify({
                 model: "claude-sonnet-4-20250514",
-                max_tokens: 1500,
+                max_tokens: 800,  // Reduced for speed
                 messages: [{
                     role: "user",
-                    content: `Search the web for current form, recent results, and expert predictions for these ${eventName} contenders: ${contenders}. Based on your research, provide a focused analysis (2-3 sentences) identifying which 2-3 athletes are the strongest picks for medals and why, citing specific recent performances or competitive advantages.`
+                    content: `Quick research: Who are the top 2 medal favorites for ${eventName} among: ${contenders}? Give a 2-sentence analysis with one specific reason for each pick.`
                 }],
                 tools: [{
                     "type": "web_search_20250305",
@@ -30,7 +30,6 @@ exports.handler = async (event) => {
 
         const data = await response.json();
         
-        // Handle tool use in response
         let analysisText = '';
         for (const block of data.content) {
             if (block.type === 'text') {
