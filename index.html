@@ -707,7 +707,7 @@ if (state.activeTab === 'stats') {
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
                         ${BADGE_DEFINITIONS.map(badge => {
                             const earned = userBadges[badge.id];
-                            return \`
+                            return `
                                 <div class="p-3 rounded-lg border-2 text-center transition-all \${
                                     earned ? 'border-yellow-400 bg-yellow-50 animate-fade-in' : 'border-gray-200 bg-gray-50 opacity-40'
                                 }">
@@ -715,7 +715,7 @@ if (state.activeTab === 'stats') {
                                     <div class="font-semibold text-xs md:text-sm">\${badge.name}</div>
                                     <div class="text-xs text-gray-500 mt-1">\${badge.description}</div>
                                 </div>
-                            \`;
+                            `;
                         }).join('')}
                     </div>
                 </div>
@@ -750,6 +750,7 @@ initialize();
 </body>
 
 </html>
+
 
 
 
