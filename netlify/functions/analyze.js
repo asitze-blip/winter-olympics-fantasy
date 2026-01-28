@@ -16,25 +16,50 @@ exports.handler = async (event) => {
             },
             body: JSON.stringify({
                 model: "claude-sonnet-4-20250514",
-                max_tokens: 1000,
+                max_tokens: 1500,
                 messages: [{
                     role: "user",
-                    content: `You are analyzing a Winter Olympics event: ${eventName}. The top 5 contenders are: ${contenders}. In one paragraph (3-4 sentences), provide a brief analysis of why 2-3 of these athletes are predicted to be top contenders. Keep it casual and exciting, like you're talking to a friend about sports picks.`
+                    content: `Search the web for current form, recent results, and expert predictions for these ${eventName} contenders: ${contenders}. Based on your research, provide a focused analysis (2-3 sentences) identifying which 2-3 athletes are the strongest picks for medals and why, citing specific recent performances or competitive advantages.`
+                }],
+                tools: [{
+                    "type": "web_search_20250305",
+                    "name": "web_search"
                 }]
             })
         });
 
         const data = await response.json();
         
+        // Handle tool use in response
+        let analysisText = '';
+        for (const block of data.content) {
+            if (block.type === 'text') {
+                analysisText += block.text;
+            }
+        }
+        
         return {
             statusCode: 200,
-            body: JSON.stringify({ analysis: data.content[0].text })
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({ 
+                analysis: analysisText || 'Unable to generate analysis.' 
+            })
         };
     } catch (error) {
         console.error('Error:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Failed to generate analysis' })
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({ 
+                error: 'Failed to generate analysis',
+                details: error.message 
+            })
         };
     }
 };
