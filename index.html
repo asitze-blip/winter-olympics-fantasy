@@ -63,6 +63,7 @@ function getTodayDateCET() {
 }
 
 // Function to fetch and parse events from Google Sheets
+
 async function fetchEventsFromSheet() {
     try {
         console.log('Fetching events from Google Sheets...');
@@ -72,8 +73,6 @@ async function fetchEventsFromSheet() {
         
         console.log('CSV fetched, parsing...');
         
-        // Parse CSV using PapaParse (already available in your Netlify function)
-        // For the frontend, we'll use a simple CSV parser
         const lines = csvText.trim().split('\n');
         const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
         
@@ -90,24 +89,21 @@ async function fetchEventsFromSheet() {
                 row[header] = values[index] ? values[index].trim().replace(/"/g, '') : '';
             });
             
-            // Skip if not today's date
-            if (row.Date !== '2026-02-08') {
+            // Only show TODAY's events (for voting)
+            if (row.Date !== todayDate) {
                 continue;
             }
             
-            // Skip if no event name
             if (!row.Event) {
                 continue;
             }
             
-            // Determine if this is a team event
             const isTeamEvent = row.IsTeamEvent === 'TRUE' || row.IsTeamEvent === 'True' || row.IsTeamEvent === '1';
             
             // Build contenders array
             const contenders = [];
             
             if (isTeamEvent) {
-                // Team event - use Top1, Top2, etc (country names)
                 for (let j = 1; j <= 5; j++) {
                     const country = row[`Top${j}`];
                     if (country && country.trim()) {
@@ -118,7 +114,6 @@ async function fetchEventsFromSheet() {
                     }
                 }
             } else {
-                // Individual event - use Top1 Name + Top1 Country, etc
                 for (let j = 1; j <= 5; j++) {
                     const name = row[`Top${j} Name`];
                     const country = row[`Top${j} Country`];
@@ -131,22 +126,33 @@ async function fetchEventsFromSheet() {
                 }
             }
             
-            // Only add event if we have contenders
             if (contenders.length > 0) {
                 const eventName = `${row.Gender ? row.Gender + "'s " : ''}${row.Event}`;
+                
+                // NEW: Check if results are available
+                const hasResults = row['Results Updated'] === 'TRUE' || row['Results Updated'] === 'True';
                 
                 events.push({
                     event: eventName,
                     sport: row.Sport,
                     venue: row.Venue,
-                    time: row.Date, // Just the date, no specific time
+                    time: row.Date,
                     isTeamEvent: isTeamEvent,
-                    contenders: contenders
+                    contenders: contenders,
+                    // NEW: Add results if available
+                    hasResults: hasResults,
+                    goldWinner: hasResults ? row['Gold Winner'] : null,
+                    silverWinner: hasResults ? row['Silver Winner'] : null,
+                    bronzeWinner: hasResults ? row['Bronze Winner'] : null
                 });
             }
         }
         
         console.log(`Found ${events.length} events for today`);
+        
+        // NEW: Also fetch ALL events with results for scoring
+        await fetchAllResultsForScoring(lines, headers);
+        
         return events;
         
     } catch (error) {
@@ -154,6 +160,104 @@ async function fetchEventsFromSheet() {
         return [];
     }
 }
+
+// NEW: Fetch all completed events (not just today) for scoring purposes
+async function fetchAllResultsForScoring(lines, headers) {
+    console.log('Fetching all results for scoring...');
+    
+    window.ALL_RESULTS = {}; // Store globally for scoring
+    
+    for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        const row = {};
+        
+        headers.forEach((header, index) => {
+            row[header] = values[index] ? values[index].trim().replace(/"/g, '') : '';
+        });
+        
+        const hasResults = row['Results Updated'] === 'TRUE' || row['Results Updated'] === 'True';
+        
+        if (hasResults && row.Event) {
+            const eventName = `${row.Gender ? row.Gender + "'s " : ''}${row.Event}`;
+            
+            window.ALL_RESULTS[eventName] = {
+                gold: row['Gold Winner'],
+                silver: row['Silver Winner'],
+                bronze: row['Bronze Winner']
+            };
+        }
+    }
+    
+    console.log(`Loaded results for ${Object.keys(window.ALL_RESULTS).length} events`);
+    
+    // Recalculate all scores
+    recalculateScores();
+}
+
+// NEW: Recalculate all user scores based on results
+function recalculateScores() {
+    console.log('Recalculating all scores...');
+    
+    const newScores = {};
+    
+    // For each user
+    for (const username in state.userPicks) {
+        let totalScore = 0;
+        const userPicks = state.userPicks[username];
+        
+        // Check each of their picks
+        for (const eventName in userPicks) {
+            const pick = userPicks[eventName];
+            const results = window.ALL_RESULTS[eventName];
+            
+            if (results) {
+                // Award points based on medal
+                if (pick === results.gold) {
+                    totalScore += 3;
+                } else if (pick === results.silver) {
+                    totalScore += 2;
+                } else if (pick === results.bronze) {
+                    totalScore += 1;
+                }
+            }
+        }
+        
+        newScores[username] = totalScore;
+    }
+    
+    // Update scores
+    state.allUserScores = newScores;
+    saveData();
+    
+    console.log('Scores recalculated:', newScores);
+}
+
+// NEW: Get user's medal breakdown
+function getUserMedals() {
+    if (!state.currentUser) return { gold: [], silver: [], bronze: [] };
+    
+    const medals = { gold: [], silver: [], bronze: [] };
+    const userPicks = state.userPicks[state.currentUser] || {};
+    
+    for (const eventName in userPicks) {
+        const pick = userPicks[eventName];
+        const results = window.ALL_RESULTS[eventName];
+        
+        if (results) {
+            if (pick === results.gold) {
+                medals.gold.push(eventName);
+            } else if (pick === results.silver) {
+                medals.silver.push(eventName);
+            } else if (pick === results.bronze) {
+                medals.bronze.push(eventName);
+            }
+        }
+    }
+    
+    return medals;
+}
+
+// ADD this to your Stats tab rendering (in renderTabContent function)
 
 // Helper function to parse a CSV line (handles commas inside quotes)
 function parseCSVLine(line) {
@@ -527,152 +631,98 @@ async function analyzeEvent(event) {
         function renderTabContent() {
             const content = document.getElementById('tabContent');
             
-if (state.activeTab === 'events') {
-    content.innerHTML = `
-        <div class="space-y-3 md:space-y-4">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl md:text-2xl font-bold text-gray-800">Medal Events Today</h2>
-                <button 
-                    onclick="loadEvents()"
-                    class="bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
-                >
-                    🔄 Refresh
-                </button>
-            </div>
-                        ${EVENTS.map((event, idx) => {
-                            const locked = isEventLocked(event);
-                            const distribution = getPickDistribution(event);
-                            const userPick = state.userPicks[state.currentUser]?.[event.event];
-                            
-                            return `
-                                <div class="bg-white rounded-lg shadow p-4 md:p-6 transition-all duration-300 hover:scale-102 ${locked ? 'opacity-75' : ''}">
-                                    <div class="flex flex-col md:flex-row md:justify-between md:items-start mb-4 gap-2">
-                                        <div class="flex-1">
-                                            <h3 class="text-lg md:text-xl font-bold text-gray-800">${event.event}</h3>
-                                            <div class="flex items-center gap-2 mt-1 text-sm text-gray-500">
-                                                🕐 <span>${getTimeUntilEvent(event.time)}</span>
-                                                ${locked ? '🔒' : ''}
-                                            </div>
-                                        </div>
-                                        <button
-                                            id="analyze-btn-${event.event}"
-                                            onclick="handleAnalyze(\`${event.event}\`)"
-                                            class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition whitespace-nowrap"
-                                        >
-                                            🤖 Analyze
-                                        </button>
-                                        <div class="flex gap-2">
-                                            ${userPick ? '<span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">✓ Picked</span>' : ''}
-                                            ${locked ? '<span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">🔒 Locked</span>' : ''}
-                                        </div>
-                                    </div>
+// Replace the existing stats tab section with this:
 
-                                    <p class="text-xs md:text-sm font-semibold text-gray-600 mb-3">Top 5 Contenders:</p>
-                                    <div class="space-y-2">
-                                        ${distribution.map(contender => {
-                                            const isSelected = state.userPicks[state.currentUser]?.[event.event] === contender.name;
-                                            return `
-                                                <button
-                                                    onclick="handleMakePick(\`${event.event}\`, \`${contender.name}\`)"
-                                                    ${locked ? 'disabled' : ''}
-                                                    class="w-full text-left p-3 rounded-lg border-2 transition-all duration-200 ${
-                                                        isSelected ? 'border-blue-500 bg-blue-50' :
-                                                        locked ? 'border-gray-200 bg-gray-50' :
-                                                        'border-gray-200 hover:border-blue-300 hover:bg-gray-50 hover:scale-102'
-                                                    }"
-                                                >
-                                                    <div class="flex justify-between items-center">
-                                                        <div>
-                                                            <span class="font-semibold text-sm md:text-base">${contender.name}</span>
-                                                            <span class="text-gray-500 ml-2 text-xs md:text-sm">(${contender.country})</span>
-                                                        </div>
-                                                        ${userPick && contender.pickCount > 0 ? `<div class="text-xs md:text-sm text-gray-500">${contender.percentage}% picked</div>` : ''}
-                                                    </div>
-                                                    ${userPick && contender.pickCount > 0 ? `
-                                                        <div class="mt-2 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                                            <div class="bg-blue-500 h-full transition-all duration-500" style="width: ${contender.percentage}%"></div>
-                                                        </div>
-                                                    ` : ''}
-                                                </button>
-                                            `;
-                                        }).join('')}
-                                    </div>         
-                                   </div>         
-                                    <div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 min-h-20">
-                                        ${state.eventAnalyses[event.event]?.loading ? '<p class="text-gray-500 italic">Generating analysis...</p>' : state.eventAnalyses[event.event]?.text ? `<p class="text-gray-700">${state.eventAnalyses[event.event].text}</p>` : ''}</div>
-                                 
+if (state.activeTab === 'stats') {
+    const stats = getUserStats();
+    const medals = getUserMedals();
+    const userBadges = state.userBadges[state.currentUser] || {};
+    
+    content.innerHTML = `
+        <div class="space-y-4">
+            <div class="bg-white rounded-lg shadow p-4 md:p-6">
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Your Statistics</h2>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4 text-center">
+                        <div class="text-2xl md:text-3xl font-bold text-blue-600">${stats.totalPicks}</div>
+                        <div class="text-xs md:text-sm text-gray-600">Total Picks</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4 text-center">
+                        <div class="text-2xl md:text-3xl font-bold text-green-600">${stats.score}</div>
+                        <div class="text-xs md:text-sm text-gray-600">Total Points</div>
+                    </div>
+                </div>
+                
+                <!-- NEW: Medal Breakdown -->
+                <div class="border-t pt-4 mb-6">
+                    <h3 class="font-semibold text-gray-800 mb-3">🏅 Your Medals</h3>
+                    
+                    ${medals.gold.length + medals.silver.length + medals.bronze.length === 0 ? 
+                        '<p class="text-gray-500 text-sm italic">No medals yet. Results will appear here after events are completed!</p>' :
+                        `
+                        ${medals.gold.length > 0 ? `
+                            <div class="mb-3">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">🥇</span>
+                                    <span class="font-semibold">Gold (${medals.gold.length} × 3pts = ${medals.gold.length * 3}pts)</span>
                                 </div>
+                                <ul class="ml-8 text-sm text-gray-600 space-y-1">
+                                    ${medals.gold.map(event => `<li>• ${event}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        
+                        ${medals.silver.length > 0 ? `
+                            <div class="mb-3">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">🥈</span>
+                                    <span class="font-semibold">Silver (${medals.silver.length} × 2pts = ${medals.silver.length * 2}pts)</span>
                                 </div>
-                            `;
+                                <ul class="ml-8 text-sm text-gray-600 space-y-1">
+                                    ${medals.silver.map(event => `<li>• ${event}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        
+                        ${medals.bronze.length > 0 ? `
+                            <div class="mb-3">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">🥉</span>
+                                    <span class="font-semibold">Bronze (${medals.bronze.length} × 1pt = ${medals.bronze.length}pts)</span>
+                                </div>
+                                <ul class="ml-8 text-sm text-gray-600 space-y-1">
+                                    ${medals.bronze.map(event => `<li>• ${event}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        `
+                    }
+                </div>
+                
+                <!-- Existing Badges Section -->
+                <div class="border-t pt-4">
+                    <h3 class="font-semibold text-gray-800 mb-3">🏆 Your Badges (${stats.badgeCount})</h3>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        ${BADGE_DEFINITIONS.map(badge => {
+                            const earned = userBadges[badge.id];
+                            return \`
+                                <div class="p-3 rounded-lg border-2 text-center transition-all \${
+                                    earned ? 'border-yellow-400 bg-yellow-50 animate-fade-in' : 'border-gray-200 bg-gray-50 opacity-40'
+                                }">
+                                    <div class="text-2xl md:text-3xl mb-1">\${badge.icon}</div>
+                                    <div class="font-semibold text-xs md:text-sm">\${badge.name}</div>
+                                    <div class="text-xs text-gray-500 mt-1">\${badge.description}</div>
+                                </div>
+                            \`;
                         }).join('')}
                     </div>
-                `;
-            } else if (state.activeTab === 'leaderboard') {
-                const sortedUsers = Object.entries(state.allUserScores).sort(([,a], [,b]) => b - a);
-                content.innerHTML = `
-                    <div class="bg-white rounded-lg shadow p-4 md:p-6">
-                        <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Leaderboard</h2>
-                        ${sortedUsers.length === 0 ? 
-                            '<p class="text-gray-500 text-center py-8 text-sm md:text-base">No players yet. Be the first to make a pick!</p>' :
-                            `<div class="space-y-2">
-                                ${sortedUsers.map(([username, score], idx) => `
-                                    <div class="flex justify-between items-center p-3 md:p-4 rounded-lg transition-all duration-300 hover:scale-102 ${
-                                        username === state.currentUser ? 'bg-blue-50 border-2 border-blue-500' : 'bg-gray-50'
-                                    }">
-                                        <div class="flex items-center gap-2 md:gap-3">
-                                            <span class="text-xl md:text-2xl font-bold text-gray-400">#${idx + 1}</span>
-                                            <span class="font-semibold text-gray-800 text-sm md:text-base">${username}</span>
-                                            ${username === state.currentUser ? '<span class="text-blue-600 text-xs md:text-sm">(You)</span>' : ''}
-                                        </div>
-                                        <div class="text-xl md:text-2xl font-bold text-blue-600">${score}</div>
-                                    </div>
-                                `).join('')}
-                            </div>`
-                        }
-                    </div>
-                `;
-            } else if (state.activeTab === 'stats') {
-                const stats = getUserStats();
-                const userBadges = state.userBadges[state.currentUser] || {};
-                content.innerHTML = `
-                    <div class="space-y-4">
-                        <div class="bg-white rounded-lg shadow p-4 md:p-6">
-                            <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Your Statistics</h2>
-                            
-                            <div class="grid grid-cols-2 gap-4 mb-6">
-                                <div class="bg-blue-50 rounded-lg p-4 text-center">
-                                    <div class="text-2xl md:text-3xl font-bold text-blue-600">${stats.totalPicks}</div>
-                                    <div class="text-xs md:text-sm text-gray-600">Total Picks</div>
-                                </div>
-                                <div class="bg-green-50 rounded-lg p-4 text-center">
-                                    <div class="text-2xl md:text-3xl font-bold text-green-600">${stats.score}</div>
-                                    <div class="text-xs md:text-sm text-gray-600">Total Points</div>
-                                </div>
-                            </div>
-                            
-                            <div class="border-t pt-4">
-                                <h3 class="font-semibold text-gray-800 mb-3">🏆 Your Badges (${stats.badgeCount})</h3>
-                                
-                                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    ${BADGE_DEFINITIONS.map(badge => {
-                                        const earned = userBadges[badge.id];
-                                        return `
-                                            <div class="p-3 rounded-lg border-2 text-center transition-all ${
-                                                earned ? 'border-yellow-400 bg-yellow-50 animate-fade-in' : 'border-gray-200 bg-gray-50 opacity-40'
-                                            }">
-                                                <div class="text-2xl md:text-3xl mb-1">${badge.icon}</div>
-                                                <div class="font-semibold text-xs md:text-sm">${badge.name}</div>
-                                                <div class="text-xs text-gray-500 mt-1">${badge.description}</div>
-                                            </div>
-                                        `;
-                                    }).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        }
+                </div>
+            </div>
+        </div>
+    `;
+}
 
         // Update time every second
         setInterval(() => {
@@ -700,6 +750,7 @@ initialize();
 </body>
 
 </html>
+
 
 
 
