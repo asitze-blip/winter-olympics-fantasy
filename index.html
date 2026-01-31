@@ -165,9 +165,11 @@ if (eventDate !== '2026-02-08') {
 
 // NEW: Fetch all completed events (not just today) for scoring purposes
 async function fetchAllResultsForScoring(lines, headers) {
-    console.log('Fetching all results for scoring...');
+    console.log('=== FETCHING RESULTS FOR SCORING ===');
+    console.log('Total lines:', lines.length);
+    console.log('Headers:', headers);
     
-    window.ALL_RESULTS = {}; // Store globally for scoring
+    window.ALL_RESULTS = {};
     
     for (let i = 1; i < lines.length; i++) {
         const values = parseCSVLine(lines[i]);
@@ -177,10 +179,23 @@ async function fetchAllResultsForScoring(lines, headers) {
             row[header] = values[index] ? values[index].trim().replace(/"/g, '') : '';
         });
         
+        // Log every row to see what we're getting
+        if (row.Event) {
+            console.log(`Row ${i}:`);
+            console.log('  Event:', row.Event);
+            console.log('  Gender:', row.Gender);
+            console.log('  Results Updated:', row['Results Updated']);
+            console.log('  Gold Winner:', row['Gold Winner']);
+            console.log('  Silver Winner:', row['Silver Winner']);
+            console.log('  Bronze Winner:', row['Bronze Winner']);
+        }
+        
         const hasResults = row['Results Updated'] === 'TRUE' || row['Results Updated'] === 'True';
+        console.log('  hasResults?', hasResults);
         
         if (hasResults && row.Event) {
             const eventName = `${row.Gender ? row.Gender + "'s " : ''}${row.Event}`;
+            console.log('  ✓ ADDING RESULT FOR:', eventName);
             
             window.ALL_RESULTS[eventName] = {
                 gold: row['Gold Winner'],
@@ -190,9 +205,10 @@ async function fetchAllResultsForScoring(lines, headers) {
         }
     }
     
-    console.log(`Loaded results for ${Object.keys(window.ALL_RESULTS).length} events`);
+    console.log('=== FINAL RESULTS ===');
+    console.log('Total events with results:', Object.keys(window.ALL_RESULTS).length);
+    console.log('All results:', window.ALL_RESULTS);
     
-    // Recalculate all scores
     recalculateScores();
 }
 
@@ -833,6 +849,7 @@ window.render = render;
     </script>
 </body>
 </html>
+
 
 
 
