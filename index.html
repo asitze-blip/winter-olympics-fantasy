@@ -91,7 +91,7 @@ async function fetchEventsFromSheet() {
             
             // Only show TODAY's events (for voting)
 const eventDate = row.Date.split('T')[0]; // Extract just the date part (YYYY-MM-DD)
-if (eventDate !== todayDate) {
+if (eventDate !== 2026-02-07) {
     continue;
 }
             
@@ -831,6 +831,7 @@ window.render = render;
     </script>
 </body>
 </html>
+
 
 
 
