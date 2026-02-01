@@ -76,6 +76,21 @@ body.dark-mode .bg-gradient-to-r {
 body.dark-mode .space-y-4 > * + * {
     margin-top: 1.5rem !important;
 }
+        /* Fix input fields for dark mode */
+body.dark-mode input[type="text"] {
+    background-color: #2a2a2a !important;
+    color: #e5e5e5 !important;
+    border-color: #3a3a3a !important;
+}
+
+body.dark-mode input[type="text"]:focus {
+    background-color: #2a2a2a !important;
+    border-color: #1e40af !important;
+}
+
+body.dark-mode input::placeholder {
+    color: #6b7280 !important;
+}
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -922,6 +937,7 @@ if (window.location.hostname.includes('olympicsynthesis')) {
     </script>
 </body>
 </html>
+
 
 
 
