@@ -608,10 +608,11 @@ async function analyzeEvent(event) {
                     <div class="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
                         <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full transform transition-all duration-300">
                             <div class="text-center mb-6">
-                                <div class="inline-block p-4 bg-yellow-100 rounded-full mb-4 animate-bounce">
-                                    <svg class="w-16 h-16 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
-                                    </svg>
+                                <div class="inline-block ${window.location.hostname.includes('olympizza2026') ? '' : 'p-4 bg-yellow-100 rounded-full'} mb-4 animate-bounce">
+                                    ${window.location.hostname.includes('olympizza2026') ? 
+                                        '<img src="https://docs.google.com/drawings/d/e/2PACX-1vTn0Vsk82fxPtYphXMWIRAfyRiIF8GWrCXbQ69eArwtgYenHnZSdeQcNv3BKnUuPZ8kplybeNo_Iutt/pub?w=480&h=360" alt="Pizza Olympics" class="w-32 h-32 object-contain">' :
+                                        '<svg class="w-16 h-16 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>'
+                                    }
                                 </div>
                                 <h1 class="text-3xl font-bold text-gray-800 mb-2">Winter Olympics</h1>
                                 <h2 class="text-xl text-gray-600 mb-2">Fantasy League</h2>
@@ -958,6 +959,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
