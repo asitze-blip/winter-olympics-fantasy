@@ -934,9 +934,31 @@ window.render = render;
 if (window.location.hostname.includes('olympicsynthesis')) {
     document.body.classList.add('dark-mode');
 }
+        // Apply dark mode for olympicsynthesis
+if (window.location.hostname.includes('olympicsynthesis')) {
+    document.body.classList.add('dark-mode');
+}
+
+// Replace icon for olympizza2026
+if (window.location.hostname.includes('olympizza2026')) {
+    // Wait for the page to load
+    window.addEventListener('DOMContentLoaded', () => {
+        // Find the bouncing icon container
+        const iconContainer = document.querySelector('.animate-bounce');
+        if (iconContainer) {
+            // Replace with pizza image
+            iconContainer.innerHTML = `
+                <img src="https://docs.google.com/drawings/d/e/2PACX-1vTn0Vsk82fxPtYphXMWIRAfyRiIF8GWrCXbQ69eArwtgYenHnZSdeQcNv3BKnUuPZ8kplybeNo_Iutt/pub?w=480&h=360" 
+                     alt="Pizza Olympics" 
+                     class="w-32 h-32 object-contain">
+            `;
+        }
+    });
+}
     </script>
 </body>
 </html>
+
 
 
 
