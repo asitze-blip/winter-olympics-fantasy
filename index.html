@@ -602,6 +602,20 @@ async function analyzeEvent(event) {
 
         function render() {
             const app = document.getElementById('app');
+               // Get custom titles based on site
+    const siteConfig = {
+        title: window.location.hostname.includes('olympizza2026') ? 'Pizza Olympics 2026' :
+               window.location.hostname.includes('olympicsynthesis') ? 'Synthesis Winter Games' :
+               window.location.hostname.includes('olympicsitze') ? 'Sitze Family Olympics' :
+               window.location.hostname.includes('olympicozzi') ? 'Cozzi Olympics Challenge' :
+               'Winter Olympics Fantasy League',
+        
+        subtitle: window.location.hostname.includes('olympizza2026') ? '🍕 Friends League' :
+                  window.location.hostname.includes('olympicsynthesis') ? '💼 Olympics Prediction Contest' :
+                  window.location.hostname.includes('olympicsitze') ? '👨‍👩‍👧‍👦 Family League' :
+                  window.location.hostname.includes('olympicozzi') ? '🏠 Prediction Contest' :
+                  'Fantasy League'
+    };
             
             if (!state.currentUser) {
                 app.innerHTML = `
@@ -959,6 +973,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
