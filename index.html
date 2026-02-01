@@ -8,6 +8,74 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
+        /* Dark mode for olympicsynthesis */
+body.dark-mode {
+    background-color: #0a0a0a;
+    color: #e5e5e5;
+}
+
+body.dark-mode .bg-gray-100 {
+    background-color: #0a0a0a !important;
+}
+
+body.dark-mode .bg-white {
+    background-color: #1a1a1a !important;
+    color: #e5e5e5 !important;
+    border: 1px solid #2a2a2a;
+}
+
+body.dark-mode .text-gray-800,
+body.dark-mode .text-gray-700,
+body.dark-mode .text-gray-600 {
+    color: #e5e5e5 !important;
+}
+
+body.dark-mode .text-gray-500 {
+    color: #a0a0a0 !important;
+}
+
+body.dark-mode .border-gray-200,
+body.dark-mode .border-gray-300 {
+    border-color: #2a2a2a !important;
+}
+
+body.dark-mode .bg-gray-50 {
+    background-color: #151515 !important;
+}
+
+body.dark-mode .hover\:bg-gray-100:hover {
+    background-color: #252525 !important;
+}
+
+/* Elegant minimal shadows */
+body.dark-mode .shadow,
+body.dark-mode .shadow-lg,
+body.dark-mode .shadow-2xl {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Keep blue accents but darker */
+body.dark-mode .bg-blue-600 {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+}
+
+body.dark-mode .bg-blue-50 {
+    background-color: #1e293b !important;
+}
+
+/* Purple gradients darker */
+body.dark-mode .bg-gradient-to-br {
+    background: linear-gradient(to bottom right, #1e1b4b 0%, #1e293b 100%) !important;
+}
+
+body.dark-mode .bg-gradient-to-r {
+    background: linear-gradient(to right, #1e3a8a 0%, #312e81 100%) !important;
+}
+
+/* Clean, minimal spacing */
+body.dark-mode .space-y-4 > * + * {
+    margin-top: 1.5rem !important;
+}
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -847,9 +915,14 @@ initialize();
 window.handleSignIn = handleSignIn;
 window.handleMakePick = handleMakePick;
 window.render = render;
+        // Apply dark mode for olympicsynthesis
+if (window.location.hostname.includes('olympicsynthesis')) {
+    document.body.classList.add('dark-mode');
+}
     </script>
 </body>
 </html>
+
 
 
 
