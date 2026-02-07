@@ -173,9 +173,16 @@ async function fetchEventsFromSheet() {
                 row[header] = values[index] ? values[index].trim().replace(/"/g, '') : '';
             });
             
-            // Only show TODAY's events (for voting)
+           // Show events for TODAY and TOMORROW
 const eventDate = row.Date.split('T')[0]; // Extract just the date part (YYYY-MM-DD)
-if (eventDate !== todayDate) {
+
+// Calculate tomorrow's date
+const tomorrow = new Date(todayDate);
+tomorrow.setDate(tomorrow.getDate() + 1);
+const tomorrowDate = tomorrow.toISOString().split('T')[0];
+
+// Only show events for today or tomorrow
+if (eventDate !== todayDate && eventDate !== tomorrowDate) {
     continue;
 }
             
@@ -973,6 +980,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
