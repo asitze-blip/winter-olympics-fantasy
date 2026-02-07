@@ -126,6 +126,22 @@ body.dark-mode input::placeholder {
         
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        // Get league-specific storage prefix based on URL
+function getLeaguePrefix() {
+    const hostname = window.location.hostname;
+    
+    if (hostname.includes('olympizza2026')) {
+        return 'friends-';
+    } else if (hostname.includes('olympicsynthesis')) {
+        return 'work-';
+    } else if (hostname.includes('olympicsitze')) {
+        return 'family-';
+    } else if (hostname.includes('olympicozzi')) {
+        return 'inlaws-';
+    }
+    
+    return 'default-'; // Fallback
+}
         
         let EVENTS = []; //will be populated from Google Sheets
 
@@ -456,16 +472,29 @@ async function loadEvents() {
             }
         };
         async function loadData() {
-            state.userPicks = await storage.get('picks');
-            state.allUserScores = await storage.get('scores');
-            state.userBadges = await storage.get('badges')
-        }
+    try {
+        const prefix = getLeaguePrefix();
+        state.userPicks = (await storage.get(prefix + 'picks')) || {};
+        state.allUserScores = (await storage.get(prefix + 'scores')) || {};
+        state.userBadges = (await storage.get(prefix + 'badges')) || {};
+    } catch (error) {
+        console.error('Load error:', error);
+        state.userPicks = {};
+        state.allUserScores = {};
+        state.userBadges = {};
+    }
+}
 
         async function saveData() {
-            await storage.set('picks', state.userPicks);
-            await storage.set('scores', state.allUserScores);
-            await storage.set('badges', state.userBadges);
-        }
+    try {
+        const prefix = getLeaguePrefix();
+        await storage.set(prefix + 'picks', state.userPicks || {});
+        await storage.set(prefix + 'scores', state.allUserScores || {});
+        await storage.set(prefix + 'badges', state.userBadges || {});
+    } catch (error) {
+        console.error('Save error:', error);
+    }
+}
 async function analyzeEvent(event) {
             const contenders = event.contenders.map(c => `${c.name} (${c.country})`).join(', ');
             
@@ -997,6 +1026,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
