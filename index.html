@@ -757,7 +757,13 @@ async function analyzeEvent(event) {
         content.innerHTML = `
             <div class="space-y-3 md:space-y-4">
                 <h2 class="text-xl md:text-2xl font-bold text-gray-800">Medal Events</h2>
-                ${EVENTS.map((event, idx) => {
+${EVENTS
+    .sort((a, b) => {
+        const timeA = new Date(a.time);
+        const timeB = new Date(b.time);
+        return timeA - timeB; // Sort by time, earliest first
+    })
+    .map((event, idx) => {
                     const locked = isEventLocked(event);
                     const distribution = getPickDistribution(event);
                     const userPick = state.userPicks[state.currentUser]?.[event.event];
@@ -980,6 +986,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
