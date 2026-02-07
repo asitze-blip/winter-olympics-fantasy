@@ -635,7 +635,20 @@ async function analyzeEvent(event) {
             checkBadges();
             renderTabContent(); // ← Changed from render()
         }
-
+        function submitPick(eventName) {
+    // Get the selected radio button for this event
+    const selectedRadio = document.querySelector(`input[name="pick-${eventName}"]:checked`);
+    
+    if (!selectedRadio) {
+        alert('Please select a contender first!');
+        return;
+    }
+    
+    const contenderName = selectedRadio.value;
+    
+    // Use your existing pick logic
+    handleMakePick(eventName, contenderName);
+}
         function render() {
             const app = document.getElementById('app');
                // Get custom titles based on site
@@ -834,39 +847,55 @@ ${EVENTS
                             <p class="text-xs md:text-sm font-semibold text-gray-600 mb-3">Top 5 Contenders:</p>
                             <div class="space-y-2">
                                 ${distribution.map(contender => {
-                                    const isSelected = state.userPicks[state.currentUser]?.[event.event] === contender.name;
-                                    return `
-                                        <button
-                                            onclick="handleMakePick(\`${event.event}\`, \`${contender.name}\`)"
-                                            ${locked || userPick ? 'disabled' : ''}
-                                            class="w-full text-left p-3 rounded-lg border-2 transition-all duration-200 ${
-                                                isSelected ? 'border-blue-500 bg-blue-50' :
-                                                locked ? 'border-gray-200 bg-gray-50' :
-                                                'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                                            }"
-                                        >
-                                            <div class="flex justify-between items-center">
-                                                <div>
-                                                    <span class="font-semibold text-sm md:text-base">${contender.name}</span>
-                                                    <span class="text-gray-500 ml-2 text-xs md:text-sm">(${contender.country})</span>
-                                                </div>
-                                                ${userPick && contender.pickCount > 0 ? `<div class="text-xs md:text-sm text-gray-500">${contender.percentage}% picked</div>` : ''}
-                                            </div>
-                                            ${userPick && contender.pickCount > 0 ? `
-                                                <div class="mt-2 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                                    <div class="bg-blue-500 h-full transition-all duration-500" style="width: ${contender.percentage}%"></div>
-                                                </div>
-                                            ` : ''}
-                                        </button>
-                                    `;
-                                }).join('')}
-                            </div>
-                            <div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 min-h-20">${state.eventAnalyses[event.event]?.loading ? '<p class="text-gray-500 italic">Generating analysis...</p>' : state.eventAnalyses[event.event]?.text ? `<p class="text-gray-700">${state.eventAnalyses[event.event].text}</p>` : ''}</div>
-                        </div>
-                    `;
-                }).join('')}
+    const isSelected = state.userPicks[state.currentUser]?.[event.event] === contender.name;
+return `
+    <label class="w-full block cursor-pointer">
+        <input 
+            type="radio" 
+            name="pick-${event.event}" 
+            value="${contender.name}"
+            ${isSelected ? 'checked' : ''}
+            ${locked || userPick ? 'disabled' : ''}
+            class="hidden peer"
+        />
+        <div class="w-full p-3 rounded-lg border-2 transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-disabled:border-gray-200 peer-disabled:bg-gray-50 ${
+            locked || userPick ? 'border-gray-200 bg-gray-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+        }">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="font-semibold text-sm md:text-base">${contender.name}</span>
+                    <span class="text-gray-500 ml-2 text-xs md:text-sm">(${contender.country})</span>
+                </div>
+                ${userPick && contender.pickCount > 0 ? `<div class="text-xs md:text-sm text-gray-500">${contender.percentage}% picked</div>` : ''}
             </div>
-        `;
+            ${userPick && contender.pickCount > 0 ? `
+                <div class="mt-2 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                    <div class="bg-blue-500 h-full transition-all duration-500" style="width: ${contender.percentage}%"></div>
+                </div>
+            ` : ''}
+        </div>
+    </label>
+`;
+}).join('')}
+
+${!locked && !userPick ? `
+    <button 
+        onclick="submitPick('${event.event}')"
+        class="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+    >
+        Submit Pick
+    </button>
+` : ''}
+</div>
+
+<div id="analysis-${event.event}" class="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200 min-h-20">
+    ${state.eventAnalyses[event.event]?.loading ? '<p class="text-gray-500 italic">Generating analysis...</p>' : state.eventAnalyses[event.event]?.text ? `<p class="text-gray-700">${state.eventAnalyses[event.event].text}</p>` : ''}
+</div>
+</div>
+`;
+}).join('')}
+</div>
+`;
     } else if (state.activeTab === 'leaderboard') {
         const sortedUsers = Object.entries(state.allUserScores).sort(([,a], [,b]) => b - a);
         content.innerHTML = `
@@ -997,6 +1026,7 @@ initialize();
 // Make functions available to the webpage buttons
 window.handleSignIn = handleSignIn;
 window.handleMakePick = handleMakePick;
+        window.submitPick = submitPick;
 window.render = render;
         // Apply dark mode for olympicsynthesis
 if (window.location.hostname.includes('olympicsynthesis')) {
@@ -1026,6 +1056,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
