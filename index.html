@@ -880,7 +880,8 @@ return `
 
 ${!locked && !userPick ? `
     <button 
-        onclick="submitPick('${event.event}')"
+        data-event="${event.event}"
+        onclick="submitPick(this.dataset.event)"
         class="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
     >
         Submit Pick
@@ -1062,6 +1063,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
