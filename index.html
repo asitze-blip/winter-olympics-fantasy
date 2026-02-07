@@ -856,7 +856,7 @@ return `
             value="${contender.name}"
             ${isSelected ? 'checked' : ''}
             ${locked || userPick ? 'disabled' : ''}
-            class="peer"
+            class="hidden peer"
         />
         <div class="w-full p-3 rounded-lg border-2 transition-all duration-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-disabled:border-gray-200 peer-disabled:bg-gray-50 ${
             locked || userPick ? 'border-gray-200 bg-gray-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
@@ -1063,6 +1063,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
