@@ -761,7 +761,18 @@ ${EVENTS
     .sort((a, b) => {
         const timeA = new Date(a.time);
         const timeB = new Date(b.time);
-        return timeA - timeB; // Sort by time, earliest first
+        const now = state.currentTime;
+        
+        // Separate upcoming vs past events
+        const aIsPast = timeA < now;
+        const bIsPast = timeB < now;
+        
+        // If one is past and one is upcoming, upcoming comes first
+        if (aIsPast && !bIsPast) return 1;  // b (upcoming) comes first
+        if (!aIsPast && bIsPast) return -1; // a (upcoming) comes first
+        
+        // If both are upcoming OR both are past, sort by time (earliest first)
+        return timeA - timeB;
     })
     .map((event, idx) => {
                     const locked = isEventLocked(event);
@@ -986,6 +997,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
