@@ -1006,11 +1006,17 @@ ${!locked && !userPick ? `
     }
 }
 
-// Update time every second
 setInterval(() => {
     state.currentTime = new Date();
+    
+    // Only re-render if we're on events tab AND there's no active selection
     if (state.currentUser && state.activeTab === 'events') {
-        renderTabContent();
+        // Check if any radio buttons are selected but not yet submitted
+        const hasUnsubmittedPick = document.querySelector('input[type="radio"]:checked');
+        
+        if (!hasUnsubmittedPick) {
+            renderTabContent();
+        }
     }
 }, 1000);
 
@@ -1056,6 +1062,7 @@ if (window.location.hostname.includes('olympizza2026')) {
     </script>
 </body>
 </html>
+
 
 
 
